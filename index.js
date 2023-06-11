@@ -158,6 +158,11 @@ async function run() {
         });
 
         // class related apis 
+        app.get('/classes', async (req, res) => {
+            const classes = await classCollection.find().toArray();
+            res.send(classes);
+        });
+
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const classData = req.body;
             const result = await classCollection.insertOne(classData);
