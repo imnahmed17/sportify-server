@@ -71,6 +71,19 @@ async function run() {
             next();
         };
 
+        // Warning: use verifyJWT before using verifyInstructor
+        const verifyInstructor = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+
+            if (user?.role !== 'instructor') {
+                return res.status(403).send({ error: true, message: 'forbidden access' });
+            }
+
+            next();
+        };
+
         // users related apis
         app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
@@ -145,7 +158,7 @@ async function run() {
         });
 
         // class related apis 
-        app.post('/classes', verifyJWT, async (req, res) => {
+        app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const classData = req.body;
             const result = await classCollection.insertOne(classData);
             res.send(result);
