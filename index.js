@@ -50,6 +50,7 @@ async function run() {
         await client.connect();
 
         const usersCollection = client.db("sportifyDB").collection("users");
+        const classCollection = client.db("sportifyDB").collection("classes");
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
@@ -140,6 +141,13 @@ async function run() {
             };
 
             const result = await usersCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
+        // class related apis 
+        app.post('/classes', verifyJWT, async (req, res) => {
+            const classData = req.body;
+            const result = await classCollection.insertOne(classData);
             res.send(result);
         });
 
