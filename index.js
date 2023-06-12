@@ -130,6 +130,32 @@ async function run() {
             res.send(result);
         });
 
+        app.get('/instructors', async (req, res) => {
+            const query = { role: 'instructor' };
+            const result = await usersCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        app.get('/instructor-stats/:name', async(req, res) => {
+            const userName = req.params.name;
+
+            const pipeline = [
+                {
+                    $match: { instructorName: userName, status: 'approved' }
+                },
+                {
+                    $group: {
+                        _id: "$instructorName",
+                        classes: { $addToSet: "$className" },
+                        count: { $sum: 1 }
+                    }
+                }
+            ];
+
+            const result = await classCollection.aggregate(pipeline).toArray();
+            res.send(result);
+        });
+
         // check instructor
         app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
@@ -169,13 +195,26 @@ async function run() {
             res.send(result);
         });
 
+        app.patch('/classes/status/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const document = req.body;
+            const updateDoc = {
+                $set: {
+                    status: document.status
+                }
+            };
+
+            const result = await classCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
         app.patch('/classes/feedback/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const document = req.body;
             const updateDoc = {
                 $set: {
-                    status: document.status,
                     feedback: document.feedback
                 }
             };
@@ -202,3 +241,42 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Sportify is running on port ${port}`);
 });
+
+
+// [
+//     {
+//         name: 'abir',
+//         class: 'math',
+//         status: 'approved'
+//     },
+//     {
+//         name: 'akash',
+//         class: 'eng',
+//         status: 'approved'
+//     },
+//     {
+//         name: 'abir',
+//         class: 'bangla',
+//         status: 'approved'
+//     },
+//     {
+//         name: 'hanif',
+//         class: 'usa',
+//         status: 'approved'
+//     },
+//     {
+//         name: 'abir',
+//         class: 'hindi',
+//         status: 'denied'
+//     },
+//     {
+//         name: 'alim',
+//         class: 'bio',
+//         status: 'approved'
+//     },
+//     {
+//         name: 'abir',
+//         class: 'math',
+//         status: 'approved'
+//     },
+// ]
