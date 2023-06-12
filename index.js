@@ -306,6 +306,23 @@ async function run() {
         });
 
         // payment related api
+        app.get('/payments', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            if (!email) {
+                res.send([]);
+            }
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ error: true, message: 'forbidden access' });
+            }
+
+            const query = { email: email };
+            const sort = { date: -1 };
+            const result = await paymentCollection.find(query).sort(sort).toArray();
+            res.send(result);
+        });
+
         app.post('/payments', verifyJWT, async (req, res) => {
             const payment = req.body;
             console.log(payment)
