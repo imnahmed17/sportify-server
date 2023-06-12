@@ -103,6 +103,7 @@ async function run() {
             res.send(result);
         });
 
+        // admin related apis 
         // check admin
         app.get('/users/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
@@ -117,6 +118,7 @@ async function run() {
             res.send(result);
         });
 
+        // make admin 
         app.patch('/users/admin/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -130,12 +132,15 @@ async function run() {
             res.send(result);
         });
 
+        // instructor related apis 
+        // get all instructor 
         app.get('/instructors', async (req, res) => {
             const query = { role: 'instructor' };
             const result = await usersCollection.find(query).toArray();
             res.send(result);
         });
 
+        // instructor stat 
         app.get('/instructor-stats/:name', async(req, res) => {
             const userName = req.params.name;
 
@@ -170,6 +175,7 @@ async function run() {
             res.send(result);
         });
 
+        // make instructor 
         app.patch('/users/instructor/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -185,16 +191,25 @@ async function run() {
 
         // class related apis 
         app.get('/classes', async (req, res) => {
-            const classes = await classCollection.find().toArray();
-            res.send(classes);
+            const result = await classCollection.find().toArray();
+            res.send(result);
         });
 
+        // get approved classes 
+        app.get('/classes/approved', async (req, res) => {
+            const query = { status: 'approved' };
+            const result = await classCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        // upload a class 
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const classData = req.body;
             const result = await classCollection.insertOne(classData);
             res.send(result);
         });
 
+        // update class status 
         app.patch('/classes/status/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -209,6 +224,7 @@ async function run() {
             res.send(result);
         });
 
+        // send feedback 
         app.patch('/classes/feedback/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
