@@ -51,6 +51,7 @@ async function run() {
 
         const usersCollection = client.db("sportifyDB").collection("users");
         const classCollection = client.db("sportifyDB").collection("classes");
+        const cartCollection = client.db("sportifyDB").collection("carts");
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
@@ -236,6 +237,29 @@ async function run() {
             };
 
             const result = await classCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
+        // cart related apis 
+        app.get('/carts', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            if (!email) {
+                res.send([]);
+            }
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ error: true, message: 'forbidden access' });
+            }
+
+            const query = { email: email };
+            const result = await cartCollection.find(query).toArray();
+            res.send(result);
+        });
+        
+        app.post('/carts', async (req, res) => {
+            const item = req.body;
+            const result = await cartCollection.insertOne(item);
             res.send(result);
         });
 
