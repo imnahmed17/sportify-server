@@ -4,6 +4,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -52,6 +53,8 @@ async function run() {
         const usersCollection = client.db("sportifyDB").collection("users");
         const classCollection = client.db("sportifyDB").collection("classes");
         const cartCollection = client.db("sportifyDB").collection("carts");
+        const paymentCollection = client.db("sportifyDB").collection("payments");
+        const enrolledClassCollection = client.db("sportifyDB").collection("enrollments");
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
@@ -270,7 +273,71 @@ async function run() {
             res.send(result);
         });
 
-        
+        // create payment intent
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100);
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            });
+        });
+
+        // payment related api
+        app.post('/payments', verifyJWT, async (req, res) => {
+            const payment = req.body;
+            console.log(payment)
+            const insertResult = await paymentCollection.insertOne(payment);
+
+            // update class information after payment
+            const classIds = payment.classIds.map(id => new ObjectId(id));
+            const filter = { _id: { $in: classIds }, availableSeats: { $gt: 0 } };
+            const updateDoc = { $inc: { availableSeats: -1, enrollCount: 1 } };
+            const options = { upsert: true };
+            const updateResult = await classCollection.updateMany(filter, updateDoc, options);
+
+            if (updateResult.modifiedCount !== classIds.length) {
+                // Rollback payment insertion
+                const query = { _id: insertResult.insertedId };
+                await paymentCollection.deleteOne(query);
+                return res.status(400).send({ error: 'One or more classes are full' });
+            }
+
+            // delete cart items after payment 
+            const cartItemIds = payment.cartItems.map(id => new ObjectId(id));
+            const query = { _id: { $in: cartItemIds } };
+            const deleteResult = await cartCollection.deleteMany(query);
+
+            // insert information to enrolledClassCollection
+            const enrolledClasses = [];
+            for (let i = 0; i < payment.classIds.length; i++) {
+                const classIdObj = new ObjectId(payment.classIds[i]);
+                const classInfo = await classCollection.findOne({ _id: classIdObj });
+
+                if (classInfo) {
+                    enrolledClasses.push({
+                        email: payment.email,
+                        classId: classInfo._id,
+                        image: classInfo.image,
+                        className: classInfo.className,
+                        instructorName: classInfo.instructorName,
+                        instructorEmail: classInfo.instructorEmail,
+                        price: classInfo.price,
+                        date: payment.date,
+                        transactionId: payment.transactionId,
+                        status: 'paid'
+                    });
+                }
+            }
+
+            const insertEnrolledResult = await enrolledClassCollection.insertMany(enrolledClasses);
+            res.send({ insertResult, updateResult, deleteResult, insertEnrolledResult });
+        });
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
