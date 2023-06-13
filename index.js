@@ -48,7 +48,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const usersCollection = client.db("sportifyDB").collection("users");
         const classCollection = client.db("sportifyDB").collection("classes");
@@ -144,6 +144,14 @@ async function run() {
             res.send(result);
         });
 
+        // get popular instructors 
+        app.get('/instructors/popular', async (req, res) => {
+            const query = { enrollCount: { $exists: true } };
+            const sort = { enrollCount: -1 };
+            const result = await usersCollection.find(query).sort(sort).limit(6).toArray();
+            res.send(result);
+        });
+
         // instructor stat 
         app.get('/instructor-stats/:name', async(req, res) => {
             const userName = req.params.name;
@@ -185,7 +193,8 @@ async function run() {
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
                 $set: {
-                    role: 'instructor'
+                    role: 'instructor',
+                    enrollCount: 0
                 }
             };
 
@@ -195,7 +204,22 @@ async function run() {
 
         // class related apis 
         app.get('/classes', async (req, res) => {
-            const result = await classCollection.find().toArray();
+            const email = req.query.email;
+            let query = {};
+
+            if (email) {
+                query = { instructorEmail: email };
+            }
+
+            const result = await classCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        // get popular classes 
+        app.get('/classes/popular', async (req, res) => {
+            const query = { enrollCount: { $exists: true } };
+            const sort = { enrollCount: -1 };
+            const result = await classCollection.find(query).sort(sort).limit(6).toArray();
             res.send(result);
         });
 
@@ -225,13 +249,51 @@ async function run() {
 
         // upload a class 
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
-            const classData = req.body;
+            const document = req.body;
+            
+            const query = { email: document.instructorEmail };
+            const instructorInfo = await usersCollection.findOne(query);
+            const instructorId = instructorInfo._id;
+            
+            const classData = { ...document, instructorId };
             const result = await classCollection.insertOne(classData);
             res.send(result);
         });
 
+        // update class info 
+        app.patch('/classes/:id', verifyJWT, verifyInstructor, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const document = req.body;
+            const updateDoc = {
+                $set: {
+                    availableSeats: document.availableSeat,
+                    price: document.price
+                }
+            };
+
+            const result = await classCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
         // update class status 
-        app.patch('/classes/status/:id', verifyJWT, verifyAdmin, async (req, res) => {
+        app.patch('/classes/approved/:id', verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const document = req.body;
+            const updateDoc = {
+                $set: {
+                    status: document.status,
+                    enrollCount: 0
+                }
+            };
+
+            const result = await classCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        });
+
+        // update class status 
+        app.patch('/classes/denied/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const document = req.body;
@@ -325,22 +387,34 @@ async function run() {
 
         app.post('/payments', verifyJWT, async (req, res) => {
             const payment = req.body;
-            console.log(payment)
             const insertResult = await paymentCollection.insertOne(payment);
 
             // update class information after payment
             const classIds = payment.classIds.map(id => new ObjectId(id));
-            const filter = { _id: { $in: classIds }, availableSeats: { $gt: 0 } };
-            const updateDoc = { $inc: { availableSeats: -1, enrollCount: 1 } };
-            const options = { upsert: true };
-            const updateResult = await classCollection.updateMany(filter, updateDoc, options);
+            const filter1 = { _id: { $in: classIds }, availableSeats: { $gt: 0 } };
+            const updateDoc1 = { $inc: { availableSeats: -1, enrollCount: 1 } };
+            const updateClassResult = await classCollection.updateMany(filter1, updateDoc1);
 
-            if (updateResult.modifiedCount !== classIds.length) {
+            if (updateClassResult.modifiedCount !== classIds.length) {
                 // Rollback payment insertion
                 const query = { _id: insertResult.insertedId };
                 await paymentCollection.deleteOne(query);
                 return res.status(400).send({ error: 'One or more classes are full' });
             }
+
+            // update instructor information after payment
+            const instructorIds = payment.instructorIds.map(id => new ObjectId(id));
+            const filter2 = { _id: { $in: instructorIds } };
+            const updateDoc2 = { $inc: { enrollCount: 1 } };
+
+            const bulkUpdateOps = instructorIds.map(instructorId => ({
+                updateOne: {
+                    filter: { _id: instructorId },
+                    update: updateDoc2
+                }
+            }));
+
+            const updateInstructorResult = await usersCollection.bulkWrite(bulkUpdateOps, { filter2 });
 
             // delete cart items after payment 
             const cartItemIds = payment.cartItems.map(id => new ObjectId(id));
@@ -351,7 +425,8 @@ async function run() {
             const enrolledClasses = [];
             for (let i = 0; i < payment.classIds.length; i++) {
                 const classIdObj = new ObjectId(payment.classIds[i]);
-                const classInfo = await classCollection.findOne({ _id: classIdObj });
+                const query = { _id: classIdObj };
+                const classInfo = await classCollection.findOne(query);
 
                 if (classInfo) {
                     enrolledClasses.push({
@@ -368,9 +443,9 @@ async function run() {
                     });
                 }
             }
-
             const insertEnrolledResult = await enrolledClassCollection.insertMany(enrolledClasses);
-            res.send({ insertResult, updateResult, deleteResult, insertEnrolledResult });
+
+            res.send({ insertResult, updateClassResult, updateInstructorResult, deleteResult, insertEnrolledResult });
         });
 
         // Send a ping to confirm a successful connection
@@ -391,42 +466,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Sportify is running on port ${port}`);
 });
-
-
-// [
-//     {
-//         name: 'abir',
-//         class: 'math',
-//         status: 'approved'
-//     },
-//     {
-//         name: 'akash',
-//         class: 'eng',
-//         status: 'approved'
-//     },
-//     {
-//         name: 'abir',
-//         class: 'bangla',
-//         status: 'approved'
-//     },
-//     {
-//         name: 'hanif',
-//         class: 'usa',
-//         status: 'approved'
-//     },
-//     {
-//         name: 'abir',
-//         class: 'hindi',
-//         status: 'denied'
-//     },
-//     {
-//         name: 'alim',
-//         class: 'bio',
-//         status: 'approved'
-//     },
-//     {
-//         name: 'abir',
-//         class: 'math',
-//         status: 'approved'
-//     },
-// ]
