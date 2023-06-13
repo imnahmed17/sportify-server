@@ -55,6 +55,8 @@ async function run() {
         const cartCollection = client.db("sportifyDB").collection("carts");
         const paymentCollection = client.db("sportifyDB").collection("payments");
         const enrolledClassCollection = client.db("sportifyDB").collection("enrollments");
+        const eventCollection = client.db("sportifyDB").collection("events");
+        const testimonialCollection = client.db("sportifyDB").collection("testimonials");
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
@@ -446,6 +448,18 @@ async function run() {
             const insertEnrolledResult = await enrolledClassCollection.insertMany(enrolledClasses);
 
             res.send({ insertResult, updateClassResult, updateInstructorResult, deleteResult, insertEnrolledResult });
+        });
+
+        // testimonial related apis 
+        app.get('/events', async (req, res) => {
+            const result = await eventCollection.find().toArray();
+            res.send(result);
+        });
+
+        // testimonial related apis 
+        app.get('/testimonials', async (req, res) => {
+            const result = await testimonialCollection.find().toArray();
+            res.send(result);
         });
 
         // Send a ping to confirm a successful connection

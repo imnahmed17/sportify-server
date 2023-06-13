@@ -2,7 +2,7 @@
 Containing some live json files
 
 ## Server Link
-Hosted in Vercel -> [sportify-server]()
+Hosted in Vercel -> [sportify-server](https://sportify-server.vercel.app)
 
 ## Resources & Credits
 [Express js](https://expressjs.com/en/starter/installing.html)
@@ -16,3 +16,5 @@ Hosted in Vercel -> [sportify-server]()
 [Vercel CLI](https://vercel.com/docs/cli)
 
 [mongodb](https://www.mongodb.com/atlas/database)
+
+[stripe](https://stripe.com/docs/payments/quickstart)
