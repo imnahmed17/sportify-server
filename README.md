@@ -17,4 +17,6 @@ Hosted in Vercel -> [sportify-server](https://sportify-server.vercel.app)
 
 [mongodb](https://www.mongodb.com/atlas/database)
 
+[jsonwebtoken](https://github.com/auth0/node-jsonwebtoken)
+
 [stripe](https://stripe.com/docs/payments/quickstart)
