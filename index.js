@@ -57,6 +57,7 @@ async function run() {
         const enrolledClassCollection = client.db("sportifyDB").collection("enrollments");
         const eventCollection = client.db("sportifyDB").collection("events");
         const testimonialCollection = client.db("sportifyDB").collection("testimonials");
+        const factsCollection = client.db("sportifyDB").collection("facts");
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
@@ -90,7 +91,7 @@ async function run() {
             next();
         };
 
-        // users related apis
+        // users related apis (only for admin)
         app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
@@ -124,8 +125,8 @@ async function run() {
             res.send(result);
         });
 
-        // make admin 
-        app.patch('/users/admin/:id', async (req, res) => {
+        // make admin (only for admin)
+        app.patch('/users/admin/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
@@ -189,8 +190,8 @@ async function run() {
             res.send(result);
         });
 
-        // make instructor 
-        app.patch('/users/instructor/:id', async (req, res) => {
+        // make instructor (only for admin)
+        app.patch('/users/instructor/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
@@ -249,7 +250,7 @@ async function run() {
             res.send(result);
         });
 
-        // upload a class 
+        // upload a class (only for instructor)
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const document = req.body;
             
@@ -262,7 +263,7 @@ async function run() {
             res.send(result);
         });
 
-        // update class info 
+        // update class info (only for instructor)
         app.patch('/classes/:id', verifyJWT, verifyInstructor, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -278,7 +279,7 @@ async function run() {
             res.send(result);
         });
 
-        // update class status 
+        // update class status (only for admin)
         app.patch('/classes/approved/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -294,7 +295,7 @@ async function run() {
             res.send(result);
         });
 
-        // update class status 
+        // update class status (only for admin)
         app.patch('/classes/denied/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -309,7 +310,7 @@ async function run() {
             res.send(result);
         });
 
-        // send feedback 
+        // send feedback (only for admin)
         app.patch('/classes/feedback/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -408,14 +409,12 @@ async function run() {
             const instructorIds = payment.instructorIds.map(id => new ObjectId(id));
             const filter2 = { _id: { $in: instructorIds } };
             const updateDoc2 = { $inc: { enrollCount: 1 } };
-
             const bulkUpdateOps = instructorIds.map(instructorId => ({
                 updateOne: {
                     filter: { _id: instructorId },
                     update: updateDoc2
                 }
             }));
-
             const updateInstructorResult = await usersCollection.bulkWrite(bulkUpdateOps, { filter2 });
 
             // delete cart items after payment 
@@ -459,6 +458,12 @@ async function run() {
         // testimonial related apis 
         app.get('/testimonials', async (req, res) => {
             const result = await testimonialCollection.find().toArray();
+            res.send(result);
+        });
+
+        // fact related apis 
+        app.get('/facts', async (req, res) => {
+            const result = await factsCollection.find().toArray();
             res.send(result);
         });
 
