@@ -91,8 +91,8 @@ async function run() {
             next();
         };
 
-        // users related apis (only for admin)
-        app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
+        // users related apis 
+        app.get('/users', verifyJWT, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
         });
@@ -250,6 +250,28 @@ async function run() {
             res.send(result);
         });
 
+        // get enrolled classes stats
+        app.get('/enrollment-stats', async (req, res) => {
+            const pipeline = [
+                {
+                    $group: {
+                        _id: "$className",
+                        count: { $sum: 1 }
+                    }
+                },
+                { 
+                    $project: { 
+                        _id: 0, 
+                        className: "$_id", 
+                        value: "$count"
+                    } 
+                }
+            ];
+
+            const result = await enrolledClassCollection.aggregate(pipeline).toArray();
+            res.send(result);
+        });
+
         // upload a class (only for instructor)
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const document = req.body;
@@ -368,6 +390,15 @@ async function run() {
             res.send({
                 clientSecret: paymentIntent.client_secret
             });
+        });
+
+        // dashboard stats
+        app.get('/dashboard-stats', verifyJWT, async (req, res) => {
+            const totalUsers = await usersCollection.countDocuments();
+            const totalInstructor = await usersCollection.countDocuments({ role: 'instructor' });
+            const totalClasses = await classCollection.countDocuments({ status: 'approved' });
+            const totalEnrollments = await enrolledClassCollection.countDocuments();
+            res.send({ totalUsers, totalInstructor, totalClasses, totalEnrollments });
         });
 
         // payment related api
