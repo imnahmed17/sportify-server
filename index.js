@@ -402,7 +402,7 @@ async function run() {
         });
 
         // payment related api
-        app.get('/totalPayments', verifyJWT, async (req, res) => {
+        app.get('/totalPayments', async (req, res) => {
             const result = await paymentCollection.estimatedDocumentCount();
             res.send({ totalPayments: result });
         });
