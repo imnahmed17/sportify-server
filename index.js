@@ -268,7 +268,7 @@ async function run() {
                 }
             ];
 
-            const result = await enrolledClassCollection.aggregate(pipeline).toArray();
+            const result = await enrolledClassCollection.aggregate(pipeline).limit(8).toArray();
             res.send(result);
         });
 
