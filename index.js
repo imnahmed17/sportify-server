@@ -402,19 +402,27 @@ async function run() {
         });
 
         // payment related api
+        app.get('/totalPayments', verifyJWT, async (req, res) => {
+            const result = await paymentCollection.estimatedDocumentCount();
+            res.send({ totalPayments: result });
+        });
+
         app.get('/payments', verifyJWT, async (req, res) => {
-            const email = req.query.email;
-            if (!email) {
-                res.send([]);
-            }
-
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                return res.status(403).send({ error: true, message: 'forbidden access' });
-            }
-
-            const query = { email: email };
+            const page = parseInt(req.query.page) || 0;
+            const limit = parseInt(req.query.limit) || 10;
+            const skip = page * limit;
             const sort = { date: -1 };
+            let query = {};
+
+            if (req.query.email) {
+                query = { email: req.query.email };
+            } 
+            
+            if (req.query?.page) {
+                const result = await paymentCollection.find(query).sort(sort).skip(skip).limit(limit).toArray();
+                return res.send(result);
+            }
+
             const result = await paymentCollection.find(query).sort(sort).toArray();
             res.send(result);
         });
